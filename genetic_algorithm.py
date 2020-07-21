@@ -15,6 +15,18 @@ def random_direction():
     return x, y
 
 
+def similar_direction(theta_init):
+    """Selects a random 2D direction using an Inverse CDF function in polar
+    coordinates
+    """
+    theta = np.random.uniform(theta_init - np.pi / 4, theta_init + np.pi / 4)
+
+    # Cartesian Conversion
+    x = np.sin(theta)
+    y = np.cos(theta)
+    return x, y
+
+
 def is_item_in_sense_region(x_pos, y_pos, item_x_pos, item_y_pos, radius):
     """Checks is something is within an individual's sense region
     """
@@ -72,6 +84,9 @@ number_of_dead_frames = [0] * population_size
 total_dead_time = 500
 running = True
 
+counts_since_last_theta = 0  # Changes theta every few frames
+current_theta = np.random.uniform(0, 2 * np.pi, population_size)
+
 # Main loop
 while running:
     pygame.time.delay(frame_rate)
@@ -110,6 +125,7 @@ while running:
                 rgb_y = np.delete(rgb_y, individual)
                 rgb_z = np.delete(rgb_z, individual)
                 velocity = np.delete(velocity, individual)
+                current_theta = np.delete(current_theta, individual)
                 number_of_dead_frames = np.delete(
                     number_of_dead_frames, individual)
                 population_size -= 1
@@ -161,9 +177,14 @@ while running:
                         distance_to_food
 
         else:
-            # Move randomly if not chasing food
+            # Move in a random direction every few frames
+            counts_since_last_theta += 1
+            if counts_since_last_theta >= np.random.uniform(0, 500):
+                current_theta[individual] = np.random.uniform(
+                    0, 2 * np.pi)
+                counts_since_last_theta = 0
             x_update, y_update = np.multiply(
-                random_direction(), velocity[individual])
+                similar_direction(current_theta[individual]), velocity[individual])
 
         # Update position, making sure to stay in the window
         x_adjusted = False
@@ -176,7 +197,6 @@ while running:
                 y_position[individual] + y_update < 0):
             y_position[individual] -= y_update
             y_adjusted = True
-
         if not x_adjusted:
             x_position[individual] += x_update
         if not y_adjusted:
