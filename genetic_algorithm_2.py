@@ -1,6 +1,10 @@
 import numpy as np
 import pygame
 import math
+import pandas as pd
+import matplotlib.pyplot as plt
+
+%matplotlib qt
 
 
 def random_direction():
@@ -24,12 +28,23 @@ def is_item_in_sense_region(x_pos, y_pos, item_x_pos, item_y_pos, radius):
         return False
 
 
+def text_label(win, text):
+    """Text to display on the window
+    """
+    pygame.font.init()
+    font = pygame.font.Font(None, 30)
+    scoretext = font.render(text, 1, (255, 255, 255))
+    win.blit(scoretext, (500, 457))
+
+
 class individual:
     def __init__(self, velocity, size, lifetime, pop):
         self.velocity = velocity
         self.size = size
+        self.init_lifetime = lifetime
         self.lifetime = lifetime
-        self.sense_region_radius = 100
+        self.pop = pop
+        self.sense_region_radius = 400
         self.current_theta = np.random.uniform(0, 2 * np.pi)
         self.x_pos = np.random.uniform(0, pop.win_x)
         self.y_pos = np.random.uniform(0, pop.win_y)
@@ -45,6 +60,23 @@ class individual:
         self.alive = True
         self.food_x_pos = [f.x_pos for f in pop.foods]
         self.food_y_pos = [f.y_pos for f in pop.foods]
+        self.foods_eaten = 0
+        self.replications = 0
+
+        self.data = []
+        self.frame_data = []
+        self.foods_eaten_data = []
+        self.replications_data = []
+
+    def collect_data_step(self):
+        self.frame_data.append(pop.frame_no)
+        self.foods_eaten_data.append(self.foods_eaten)
+        self.replications_data.append(self.replications)
+
+    def consolidate_data(self):
+        self.data.append(self.frame_data)
+        self.data.append(self.foods_eaten_data)
+        self.data.append(self.replications_data)
 
     def update_position(self):
         """Steps the individual in a somewhat random direction
@@ -67,7 +99,11 @@ class individual:
                 # Eata the food once upon it
                 if distance_to_food == 0:
                     food_piece.eat()
+                    self.foods_eaten += 1
                     self.lifetime += food_piece.extra_life_time
+
+                    self.pop.foods = np.delete(self.foods, food_index)
+                    self.pop.food_number -= 1
 
                 # Otherwise move directly towards food
                 else:
@@ -103,6 +139,15 @@ class individual:
             self.x_pos += x_update
             self.y_pos += y_update
 
+    def replicate(self):
+        """Replicates the current individual
+        """
+        new_ind = individual(2, 30, self.init_lifetime, self.pop)
+        new_ind.x_pos = self.x_pos
+        new_ind.y_pos = self.y_pos
+        pop.individuals.append(new_ind)
+        pop.pop_size += 1
+
     def step(self):
         """Updates the properties of the individual for a step
         """
@@ -110,6 +155,19 @@ class individual:
         if self.time_lived < self.lifetime:
             # Keep moving while alive
             self.update_position()
+
+            # Replicate individual for every two foods it eats
+            if self.foods_eaten % 2 == 0 and self.foods_eaten / 2 != self.replications:
+                self.replicate()
+                self.replications += 1
+
+            # Colour change
+            red_colour = np.linspace(255, 0, 5000)
+            life_remaining = self.lifetime - self.time_lived
+            if life_remaining < 5000:
+                self.colour = (red_colour[life_remaining], 0, 255)
+            else:
+                self.colour = (0, 0, 255)
 
         elif self.time_lived <= self.lifetime + self.dying_time:
             # If dying change colour to red
@@ -140,12 +198,20 @@ class population:
         self.food_number = food_number
         self.individuals = []
         self.foods = []
+        self.data = pd.DataFrame()
+        self.frame_data = []
+        self.pop_size_data = []
+        self.food_number_data = []
+        self.individual_data = pd.DataFrame()
+        self.dead_individuals = 0
 
     def simulate(self, iterations):
         """Starts a simulation of the population, opening a pygame window to
         animate the population evolution
         """
         pygame.init()
+        pygame.font.init()
+        font = pygame.font.Font('freesansbold.ttf', 32)
 
         # Create window
         win = pygame.display.set_mode((self.win_x, self.win_y))
@@ -153,28 +219,33 @@ class population:
 
         # Create initial individuals
         for i in range(self.pop_size):
-            ind_temp = individual(5, 30, 3000, self)
+            ind_temp = individual(2, 30, 1500, self)
             self.individuals.append(ind_temp)
 
         # Create initial food
         for i in range(self.food_number):
-            food_temp = food(1000, self)
+            food_temp = food(500, self)
             self.foods.append(food_temp)
 
         # Main loop
         running = True
-        frame_no = 0
+        self.frame_no = 0
         while running:
             pygame.time.delay(int(1 / (60 * 1000)))
-            frame_no += 1
+            self.frame_no += 1
 
             # Stop the program when window is quit
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
-            # Step and animate each individual
             win.fill((0, 0, 0))
+
+            # Population text
+            pop_text = font.render("Population: %s" %
+                                   self.pop_size, True, (255, 255, 255))
+            win.blit(pop_text, (20, 20))
+            # Step and animate each individual
             ind_index = 0
             for ind in self.individuals:
                 # If alive, move
@@ -185,6 +256,12 @@ class population:
                     ind_index += 1
                 # If dead remove from population
                 else:
+                    # collect data
+                    self.dead_individuals += 1
+                    ind.consolidate_data()
+                    self.individual_data['ind_%s' %
+                                         self.dead_individuals] = ind.data
+
                     self.individuals = np.delete(self.individuals, ind_index)
                     self.pop_size -= 1
 
@@ -197,18 +274,67 @@ class population:
                                                               food_piece.x_size, food_piece.y_size))
                     food_index += 1
                 # If eaten remove from foods
-                else:
-                    self.foods = np.delete(self.foods, food_index)
-                    self.food_number -= 1
+                # else:
+                #     self.foods = np.delete(self.foods, food_index)
+                #     self.food_number -= 1
 
             pygame.display.update()
 
+            # Summarise each step and save data
+            self.frame_data.append(self.frame_no)
+            self.pop_size_data.append(self.pop_size)
+            self.food_number_data.append(self.food_number)
+            for j, ind in enumerate(self.individuals):
+                ind.collect_data_step()
+
             # Finish evolution after an amount of iterations
-            if frame_no >= iterations:
+            if self.frame_no >= iterations or self.pop_size == 0:
                 running = False
 
         pygame.quit()
 
+        # Collect data
+        self.data['frame'] = self.frame_data
+        self.data['population'] = self.pop_size_data
+        self.data['food_number'] = self.food_number_data
 
-pop = population(3, 4)
-pop.simulate(10000)
+        # for ind in self.individuals:
+        #     ind.consolidate_data()
+
+    def plot_summary(self):
+        plt.figure()
+        plt.xlabel("Frame")
+        plt.ylabel("Population")
+        plt.plot(self.data.frame, self.data.population)
+        plt.plot(self.data.frame, self.data.food_number)
+        plt.show()
+
+    def plot_ind(self, ind):
+        """Plot frame, food and replications of individuals
+        """
+        ind_string = "ind_" + str(ind)
+        data = self.individual_data[ind_string]
+        frame_data = data[0]
+        food_eaten_data = data[1]
+        replication_data = data[2]
+
+        plt.figure()
+        plt.title("Individual: " + str(ind))
+        plt.xlabel("Frame")
+        plt.ylabel("#")
+        plt.plot(frame_data, food_eaten_data, label="Food Eaten")
+        plt.plot(frame_data, replication_data, label="Replications")
+        plt.legend()
+        plt.show()
+
+
+pop = population(1, 8)
+pop.simulate(150000)
+pop.plot_summary()
+plt.show()
+
+pop.plot_ind(1)
+
+
+"""They replicating too quick as multiple inds can eat a single piece of food!
+"""

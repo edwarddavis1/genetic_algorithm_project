@@ -1,14 +1,9 @@
 import numpy as np
+import pandas as pd
 
-x = np.array([10, 20, 30, 40, 50])
-i = 0
-for v in x:
-    print("%s, %s" % (i, v))
-    if v in (10, 30, 40):
-        x = np.delete(x, i)
-    else:
-        i += 1
-x
-x
-x = np.delete(x, 1)
-x
+df = []
+df.append([0, 1, 2, 3])
+df.append([10, 20, 30, 40])
+
+df2 = pd.DataFrame()
+df2['1'] = df
