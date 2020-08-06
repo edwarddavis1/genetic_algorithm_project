@@ -4,19 +4,7 @@ import math
 import pandas as pd
 import matplotlib.pyplot as plt
 
-%matplotlib qt
-
-
-def random_direction():
-    """Selects a random 2D direction using an Inverse CDF function in polar
-    coordinates
-    """
-    theta = np.random.uniform(0, 2 * np.pi)
-
-    # Cartesian Conversion
-    x = np.sin(theta)
-    y = np.cos(theta)
-    return x, y
+# %matplotlib qt
 
 
 def is_item_in_sense_region(x_pos, y_pos, item_x_pos, item_y_pos, radius):
@@ -44,7 +32,7 @@ class individual:
         self.init_lifetime = lifetime
         self.lifetime = lifetime
         self.pop = pop
-        self.sense_region_radius = 400
+        self.sense_region_radius = 100
         self.current_theta = np.random.uniform(0, 2 * np.pi)
         self.x_pos = np.random.uniform(0, pop.win_x)
         self.y_pos = np.random.uniform(0, pop.win_y)
@@ -97,13 +85,10 @@ class individual:
                 distance_to_food = int(distance_to_food)
 
                 # Eata the food once upon it
-                if distance_to_food == 0:
+                if distance_to_food == 0 and not food_piece.eaten:
                     food_piece.eat()
                     self.foods_eaten += 1
                     self.lifetime += food_piece.extra_life_time
-
-                    self.pop.foods = np.delete(self.foods, food_index)
-                    self.pop.food_number -= 1
 
                 # Otherwise move directly towards food
                 else:
@@ -177,8 +162,8 @@ class individual:
 
 
 class food:
-    def __init__(self, extra_life_time, pop):
-        self.extra_life_time = extra_life_time
+    def __init__(self, pop):
+        self.extra_life_time = 2000
         self.colour = (0, 255, 0)
         self.x_size = 10
         self.y_size = 10
@@ -191,11 +176,12 @@ class food:
 
 
 class population:
-    def __init__(self, pop_size, food_number):
+    def __init__(self, pop_size, food_number, food_regen):
         self.pop_size = pop_size
         self.win_x = 800
         self.win_y = 800
         self.food_number = food_number
+        self.food_regen = food_regen
         self.individuals = []
         self.foods = []
         self.data = pd.DataFrame()
@@ -205,7 +191,7 @@ class population:
         self.individual_data = pd.DataFrame()
         self.dead_individuals = 0
 
-    def simulate(self, iterations):
+    def simulate(self):
         """Starts a simulation of the population, opening a pygame window to
         animate the population evolution
         """
@@ -219,13 +205,16 @@ class population:
 
         # Create initial individuals
         for i in range(self.pop_size):
-            ind_temp = individual(2, 30, 1500, self)
+            ind_temp = individual(2, 30, 4000, self)
             self.individuals.append(ind_temp)
 
         # Create initial food
         for i in range(self.food_number):
-            food_temp = food(500, self)
+            food_temp = food(self)
             self.foods.append(food_temp)
+
+        # Food regeneration
+        food_regen_wait_time = 1000 / self.food_regen
 
         # Main loop
         running = True
@@ -245,6 +234,13 @@ class population:
             pop_text = font.render("Population: %s" %
                                    self.pop_size, True, (255, 255, 255))
             win.blit(pop_text, (20, 20))
+
+            # Food regeneration
+            if self.frame_no % food_regen_wait_time == 0:
+                self.food_number += 1
+                new_food = food(self)
+                self.foods.append(new_food)
+
             # Step and animate each individual
             ind_index = 0
             for ind in self.individuals:
@@ -262,7 +258,8 @@ class population:
                     self.individual_data['ind_%s' %
                                          self.dead_individuals] = ind.data
 
-                    self.individuals = np.delete(self.individuals, ind_index)
+                    # self.individuals = np.delete(self.individuals, ind_index)
+                    self.individuals.pop(ind_index)
                     self.pop_size -= 1
 
             # Animate foods
@@ -274,9 +271,10 @@ class population:
                                                               food_piece.x_size, food_piece.y_size))
                     food_index += 1
                 # If eaten remove from foods
-                # else:
-                #     self.foods = np.delete(self.foods, food_index)
-                #     self.food_number -= 1
+                else:
+                    # self.foods = np.delete(self.foods, food_index)
+                    self.foods.pop(food_index)
+                    self.food_number -= 1
 
             pygame.display.update()
 
@@ -288,7 +286,7 @@ class population:
                 ind.collect_data_step()
 
             # Finish evolution after an amount of iterations
-            if self.frame_no >= iterations or self.pop_size == 0:
+            if self.pop_size == 0:
                 running = False
 
         pygame.quit()
@@ -304,9 +302,10 @@ class population:
     def plot_summary(self):
         plt.figure()
         plt.xlabel("Frame")
-        plt.ylabel("Population")
-        plt.plot(self.data.frame, self.data.population)
-        plt.plot(self.data.frame, self.data.food_number)
+        plt.ylabel("#")
+        plt.plot(self.data.frame, self.data.population, label="Population")
+        plt.plot(self.data.frame, self.data.food_number, label="Food Number")
+        plt.legend()
         plt.show()
 
     def plot_ind(self, ind):
@@ -328,13 +327,9 @@ class population:
         plt.show()
 
 
-pop = population(1, 8)
-pop.simulate(150000)
+pop = population(pop_size=1, food_number=10, food_regen=2)
+pop.simulate()
 pop.plot_summary()
 plt.show()
 
-pop.plot_ind(1)
-
-
-"""They replicating too quick as multiple inds can eat a single piece of food!
-"""
+# pop.plot_ind(1)

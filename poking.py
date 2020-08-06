@@ -7,3 +7,5 @@ df.append([10, 20, 30, 40])
 
 df2 = pd.DataFrame()
 df2['1'] = df
+
+df2
