@@ -26,7 +26,8 @@ def text_label(win, text):
 
 
 class individual:
-    def __init__(self, velocity, size, lifetime, pop):
+    def __init__(self, velocity, size, lifetime, pop, name):
+        self.name = name
         self.velocity = velocity
         self.size = size
         self.init_lifetime = lifetime
@@ -44,7 +45,7 @@ class individual:
         self.x_min = 0
         self.y_min = 0
         self.time_lived = 0
-        self.dying_time = 1000
+        self.dying_time = 200
         self.alive = True
         self.food_x_pos = [f.x_pos for f in pop.foods]
         self.food_y_pos = [f.y_pos for f in pop.foods]
@@ -56,12 +57,18 @@ class individual:
         self.foods_eaten_data = []
         self.replications_data = []
 
+        print("%s created" % self.name)
+
+    def __del__(self):
+        print("%s died" % self.name)
+
     def collect_data_step(self):
         self.frame_data.append(pop.frame_no)
         self.foods_eaten_data.append(self.foods_eaten)
         self.replications_data.append(self.replications)
 
     def consolidate_data(self):
+        print("Individual %s consolidating" % self.name)
         self.data.append(self.frame_data)
         self.data.append(self.foods_eaten_data)
         self.data.append(self.replications_data)
@@ -127,7 +134,8 @@ class individual:
     def replicate(self):
         """Replicates the current individual
         """
-        new_ind = individual(2, 30, self.init_lifetime, self.pop)
+        new_ind = individual(2, 30, self.init_lifetime,
+                             self.pop, "%s copy" % self.name)
         new_ind.x_pos = self.x_pos
         new_ind.y_pos = self.y_pos
         pop.individuals.append(new_ind)
@@ -176,12 +184,13 @@ class food:
 
 
 class population:
-    def __init__(self, pop_size, food_number, food_regen):
+    def __init__(self, pop_size, food_number, food_regen, lifetimes):
         self.pop_size = pop_size
         self.win_x = 800
         self.win_y = 800
         self.food_number = food_number
         self.food_regen = food_regen
+        self.lifetimes = lifetimes
         self.individuals = []
         self.foods = []
         self.data = pd.DataFrame()
@@ -205,16 +214,14 @@ class population:
 
         # Create initial individuals
         for i in range(self.pop_size):
-            ind_temp = individual(2, 30, 4000, self)
+            ind_temp = individual(2, 30, self.lifetimes,
+                                  self, "Individual %s" % (i + 1))
             self.individuals.append(ind_temp)
 
         # Create initial food
         for i in range(self.food_number):
             food_temp = food(self)
             self.foods.append(food_temp)
-
-        # Food regeneration
-        food_regen_wait_time = 1000 / self.food_regen
 
         # Main loop
         running = True
@@ -236,31 +243,41 @@ class population:
             win.blit(pop_text, (20, 20))
 
             # Food regeneration
-            if self.frame_no % food_regen_wait_time == 0:
-                self.food_number += 1
-                new_food = food(self)
-                self.foods.append(new_food)
+            if self.food_regen:
+                food_regen_wait_time = 1000 / self.food_regen
+                if self.frame_no % food_regen_wait_time == 0:
+                    self.food_number += 1
+                    new_food = food(self)
+                    self.foods.append(new_food)
 
             # Step and animate each individual
             ind_index = 0
+            temp_individuals = []
             for ind in self.individuals:
                 # If alive, move
                 if ind.alive:
+                    temp_individuals.append(ind)
                     ind.step()
                     pygame.draw.rect(win, ind.colour, (ind.x_pos, ind.y_pos,
                                                        ind.x_size, ind.y_size))
                     ind_index += 1
+
                 # If dead remove from population
                 else:
-                    # collect data
+                    # Collect data from newly dead individual
                     self.dead_individuals += 1
                     ind.consolidate_data()
-                    self.individual_data['ind_%s' %
-                                         self.dead_individuals] = ind.data
+                    # print(len(ind.data))
+                    # if len(ind.data) > 3:
+                    #     print(ind.data)
+                    # self.individual_data['ind_%s' %
+                    #                      self.dead_individuals] = ind.data
 
-                    # self.individuals = np.delete(self.individuals, ind_index)
-                    self.individuals.pop(ind_index)
+                    del ind
+                    # self.individuals.pop(ind_index)
                     self.pop_size -= 1
+
+            self.individuals = temp_individuals
 
             # Animate foods
             food_index = 0
@@ -327,9 +344,13 @@ class population:
         plt.show()
 
 
-pop = population(pop_size=1, food_number=10, food_regen=2)
+pop = population(pop_size=15, food_number=16, food_regen=2, lifetimes=1000)
 pop.simulate()
-pop.plot_summary()
-plt.show()
+# pop.plot_summary()
+# plt.show()
 
 # pop.plot_ind(1)
+
+
+"""BUG: If many individuals die at once then crash
+"""
