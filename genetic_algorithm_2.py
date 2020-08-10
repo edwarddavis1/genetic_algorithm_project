@@ -350,7 +350,3 @@ pop.simulate()
 # plt.show()
 
 # pop.plot_ind(1)
-
-
-"""BUG: If many individuals die at once then crash
-"""
