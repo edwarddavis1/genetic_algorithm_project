@@ -1,11 +1,7 @@
-import numpy as np
 import pandas as pd
 
-df = []
-df.append([0, 1, 2, 3])
-df.append([10, 20, 30, 40])
-
-df2 = pd.DataFrame()
-df2['1'] = df
-
-df2
+df = pd.DataFrame(columns={'A', 'B'})
+new_row = {'A': 12, 'Bw': "ten"}
+df.append(new_row, ignore_index=True)
+df
+len(df)

@@ -16,15 +16,6 @@ def is_item_in_sense_region(x_pos, y_pos, item_x_pos, item_y_pos, radius):
         return False
 
 
-def text_label(win, text):
-    """Text to display on the window
-    """
-    pygame.font.init()
-    font = pygame.font.Font(None, 30)
-    scoretext = font.render(text, 1, (255, 255, 255))
-    win.blit(scoretext, (500, 457))
-
-
 class individual:
     def __init__(self, velocity, size, lifetime, pop, name):
         self.name = name
@@ -52,26 +43,11 @@ class individual:
         self.foods_eaten = 0
         self.replications = 0
 
-        self.data = []
-        self.frame_data = []
-        self.foods_eaten_data = []
-        self.replications_data = []
-
         print("%s created" % self.name)
 
     def __del__(self):
+        pop.add_individual_to_data(self)
         print("%s died" % self.name)
-
-    def collect_data_step(self):
-        self.frame_data.append(pop.frame_no)
-        self.foods_eaten_data.append(self.foods_eaten)
-        self.replications_data.append(self.replications)
-
-    def consolidate_data(self):
-        print("Individual %s consolidating" % self.name)
-        self.data.append(self.frame_data)
-        self.data.append(self.foods_eaten_data)
-        self.data.append(self.replications_data)
 
     def update_position(self):
         """Steps the individual in a somewhat random direction
@@ -193,12 +169,30 @@ class population:
         self.lifetimes = lifetimes
         self.individuals = []
         self.foods = []
-        self.data = pd.DataFrame()
+        self.macro_pop_data = pd.DataFrame()
         self.frame_data = []
         self.pop_size_data = []
         self.food_number_data = []
         self.individual_data = pd.DataFrame()
         self.dead_individuals = 0
+        self.past_individual_data = pd.DataFrame()
+        column_titles = ['Individual', 'Alive at End', 'Time Lived',
+                         'Food Eaten', 'Replications', 'Size', 'Velocity', 'Sense']
+        self.past_individual_data = self.past_individual_data.reindex(
+            columns=column_titles)
+
+    def add_individual_to_data(self, ind):
+        """Once an individual dies, add its genes and performance to dataframe
+        """
+        new_row = {'Individual': ind.name,
+                   'Alive at End': ind.alive,
+                   'Time Lived': ind.time_lived,
+                   'Food Eaten': ind.foods_eaten,
+                   'Replications': ind.replications,
+                   'Size': ind.size, 'Velocity': ind.velocity,
+                   'Sense': ind.sense_region_radius}
+        self.past_individual_data = self.past_individual_data.append(
+            new_row, ignore_index=True)
 
     def simulate(self):
         """Starts a simulation of the population, opening a pygame window to
@@ -206,7 +200,8 @@ class population:
         """
         pygame.init()
         pygame.font.init()
-        font = pygame.font.Font('freesansbold.ttf', 32)
+        pop_font = pygame.font.Font('freesansbold.ttf', 32)
+        ind_font = pygame.font.Font('freesansbold.ttf', 25)
 
         # Create window
         win = pygame.display.set_mode((self.win_x, self.win_y))
@@ -215,7 +210,7 @@ class population:
         # Create initial individuals
         for i in range(self.pop_size):
             ind_temp = individual(2, 30, self.lifetimes,
-                                  self, "Individual %s" % (i + 1))
+                                  self, "I %s" % (i + 1))
             self.individuals.append(ind_temp)
 
         # Create initial food
@@ -238,8 +233,8 @@ class population:
             win.fill((0, 0, 0))
 
             # Population text
-            pop_text = font.render("Population: %s" %
-                                   self.pop_size, True, (255, 255, 255))
+            pop_text = pop_font.render("Population: %s" %
+                                       self.pop_size, True, (255, 255, 255))
             win.blit(pop_text, (20, 20))
 
             # Food regeneration
@@ -258,23 +253,19 @@ class population:
                 if ind.alive:
                     temp_individuals.append(ind)
                     ind.step()
+
+                    # Draw individual
                     pygame.draw.rect(win, ind.colour, (ind.x_pos, ind.y_pos,
                                                        ind.x_size, ind.y_size))
+                    # Label individual
+                    ind_text = ind_font.render(ind.name, True, (255, 255, 255))
+                    win.blit(ind_text, (ind.x_pos, ind.y_pos))
                     ind_index += 1
 
                 # If dead remove from population
                 else:
-                    # Collect data from newly dead individual
                     self.dead_individuals += 1
-                    ind.consolidate_data()
-                    # print(len(ind.data))
-                    # if len(ind.data) > 3:
-                    #     print(ind.data)
-                    # self.individual_data['ind_%s' %
-                    #                      self.dead_individuals] = ind.data
-
                     del ind
-                    # self.individuals.pop(ind_index)
                     self.pop_size -= 1
 
             self.individuals = temp_individuals
@@ -295,12 +286,10 @@ class population:
 
             pygame.display.update()
 
-            # Summarise each step and save data
+            # Summarise each step and save macro population data
             self.frame_data.append(self.frame_no)
             self.pop_size_data.append(self.pop_size)
             self.food_number_data.append(self.food_number)
-            for j, ind in enumerate(self.individuals):
-                ind.collect_data_step()
 
             # Finish evolution after an amount of iterations
             if self.pop_size == 0:
@@ -309,19 +298,22 @@ class population:
         pygame.quit()
 
         # Collect data
-        self.data['frame'] = self.frame_data
-        self.data['population'] = self.pop_size_data
-        self.data['food_number'] = self.food_number_data
+        self.macro_pop_data['frame'] = self.frame_data
+        self.macro_pop_data['population'] = self.pop_size_data
+        self.macro_pop_data['food_number'] = self.food_number_data
 
-        # for ind in self.individuals:
-        #     ind.consolidate_data()
+        # Document final individuals
+        for ind in self.individuals:
+            pop.add_individual_to_data(ind)
 
     def plot_summary(self):
         plt.figure()
         plt.xlabel("Frame")
         plt.ylabel("#")
-        plt.plot(self.data.frame, self.data.population, label="Population")
-        plt.plot(self.data.frame, self.data.food_number, label="Food Number")
+        plt.plot(self.macro_pop_data.frame,
+                 self.macro_pop_data.population, label="Population")
+        plt.plot(self.macro_pop_data.frame,
+                 self.macro_pop_data.food_number, label="Food Number")
         plt.legend()
         plt.show()
 
@@ -350,3 +342,7 @@ pop.simulate()
 # plt.show()
 
 # pop.plot_ind(1)
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pop.past_individual_data.sort_values(by='Time Lived', ascending=False)
