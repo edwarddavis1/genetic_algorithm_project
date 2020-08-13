@@ -18,35 +18,39 @@ def is_item_in_sense_region(x_pos, y_pos, item_x_pos, item_y_pos, radius):
 
 class individual:
     def __init__(self, velocity, size, sense_region_radius, lifetime, pop, name):
-        # Non-genetic
-        self.name = name
-
-        # Genetic
-        self.velocity = velocity
-        self.size = size
-        self.init_lifetime = lifetime
-        self.lifetime = lifetime
-        self.sense_region_radius = sense_region_radius
 
         # World
         self.pop = pop
         self.current_theta = np.random.uniform(0, 2 * np.pi)
-        self.x_pos = np.random.uniform(0, pop.win_x)
-        self.y_pos = np.random.uniform(0, pop.win_y)
-        self.x_size = 30
-        self.y_size = 30
-        self.colour = (0, 0, 255)
         self.x_max = pop.win_x
         self.y_max = pop.win_y
         self.x_min = 0
         self.y_min = 0
-        self.time_lived = 0
-        self.dying_time = 200
-        self.alive = True
         self.food_x_pos = [f.x_pos for f in pop.foods]
         self.food_y_pos = [f.y_pos for f in pop.foods]
+
+        # Genetic Parameters
+        self.velocity = velocity
+        self.size = size
+        self.sense_region_radius = sense_region_radius
+        self.chromosome = [self.velocity, self.size, self.sense_region_radius]
+
+        # Non-genetic Descriptors
+        self.name = name
+        self.init_lifetime = lifetime
+        self.x_pos = np.random.uniform(0, pop.win_x)
+        self.y_pos = np.random.uniform(0, pop.win_y)
+        self.x_size = size
+        self.y_size = size
+        self.dying_time = 200
+        self.colour = (0, 0, 255)
+
+        # Ongoing performance
+        self.time_lived = 0
+        self.alive = True
         self.foods_eaten = 0
         self.replications = 0
+        self.life_remaining = lifetime
 
         print("%s created" % self.name)
 
@@ -77,7 +81,7 @@ class individual:
                 if distance_to_food == 0 and not food_piece.eaten:
                     food_piece.eat()
                     self.foods_eaten += 1
-                    self.lifetime += food_piece.extra_life_time
+                    self.life_remaining += food_piece.extra_life_time
 
                 # Otherwise move directly towards food
                 else:
@@ -128,7 +132,7 @@ class individual:
         """Updates the properties of the individual for a step
         """
         self.time_lived += 1
-        if self.time_lived < self.lifetime:
+        if self.time_lived < self.life_remaining:
             # Keep moving while alive
             self.update_position()
 
@@ -139,13 +143,13 @@ class individual:
 
             # Colour change
             red_colour = np.linspace(255, 0, 5000)
-            life_remaining = self.lifetime - self.time_lived
+            life_remaining = self.life_remaining - self.time_lived
             if life_remaining < 5000:
                 self.colour = (red_colour[life_remaining], 0, 255)
             else:
                 self.colour = (0, 0, 255)
 
-        elif self.time_lived <= self.lifetime + self.dying_time:
+        elif self.time_lived <= self.life_remaining + self.dying_time:
             # If dying change colour to red
             self.colour = (255, 0, 0)
         else:
@@ -173,7 +177,7 @@ class population:
         self.win_y = 800
         self.food_number = food_number
         self.food_regen = food_regen
-        self.lifetimes = lifetimes
+        self.life_remainings = lifetimes
         self.individuals = []
         self.foods = []
         self.macro_pop_data = pd.DataFrame()
@@ -216,7 +220,7 @@ class population:
 
         # Create initial individuals
         for i in range(self.pop_size):
-            ind_temp = individual(2, 30, 100, self.lifetimes,
+            ind_temp = individual(2, 30, 100, self.life_remainings,
                                   self, "I %s" % (i + 1))
             self.individuals.append(ind_temp)
 
@@ -236,7 +240,6 @@ class population:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                    pygame.quit()
 
             win.fill((0, 0, 0))
 
@@ -263,11 +266,12 @@ class population:
                     ind.step()
 
                     # Draw individual
-                    pygame.draw.rect(win, ind.colour, (ind.x_pos, ind.y_pos,
-                                                       ind.x_size, ind.y_size))
+                    pygame.draw.rect(win, ind.colour,
+                                     (int(round(ind.x_pos)), int(round(ind.y_pos)),
+                                      int(round(ind.x_size)), int(round(ind.y_size))))
                     # Label individual
                     ind_text = ind_font.render(ind.name, True, (255, 255, 255))
-                    win.blit(ind_text, (ind.x_pos, ind.y_pos))
+                    win.blit(ind_text, (int(round(ind.x_pos)), int(round(ind.y_pos))))
                     ind_index += 1
 
                 # If dead remove from population
@@ -284,8 +288,8 @@ class population:
                 # If not eaten, draw
                 if not food_piece.eaten:
                     pygame.draw.rect(win, food_piece.colour,
-                                     (food_piece.x_pos, food_piece.y_pos,
-                                      food_piece.x_size, food_piece.y_size))
+                                     (int(round(food_piece.x_pos)), int(round(food_piece.y_pos)),
+                                      int(round(food_piece.x_size)), int(round(food_piece.y_size))))
                     food_index += 1
                 # If eaten remove from foods
                 else:
@@ -304,8 +308,6 @@ class population:
             if self.pop_size == 0:
                 running = False
 
-        pygame.quit()
-
         # Collect data
         self.macro_pop_data['frame'] = self.frame_data
         self.macro_pop_data['population'] = self.pop_size_data
@@ -314,7 +316,8 @@ class population:
         # Document final individuals
         for ind in self.individuals:
             pop.add_individual_to_data(ind)
-            del ind
+
+        pygame.quit()
 
     def plot_summary(self):
         plt.figure()
@@ -346,10 +349,10 @@ class population:
         plt.show()
 
 
-pop = population(pop_size=1, food_number=0, food_regen=0, lifetimes=5000)
+pop = population(pop_size=10, food_number=10, food_regen=2, lifetimes=5000)
 pop.simulate()
-# pop.plot_summary()
-# plt.show()
+pop.plot_summary()
+plt.show()
 
 # pop.plot_ind(1)
 
