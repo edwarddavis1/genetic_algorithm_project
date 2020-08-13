@@ -16,8 +16,23 @@ def is_item_in_sense_region(x_pos, y_pos, item_x_pos, item_y_pos, radius):
         return False
 
 
+def get_lifetime(energy_use):
+    """Calculates the lifetime of an individual based on its energy use
+    """
+    constant = 67.5E6
+    lifetime = int(round(constant / energy_use))
+    return lifetime
+
+
+def get_energy_use(ind):
+    """Calculates the energy use of an individual based on chromosome
+    """
+    energy_use = 0.5 * ind.size**3 * ind.velocity**2
+    return energy_use
+
+
 class individual:
-    def __init__(self, velocity, size, sense_region_radius, lifetime, pop, name):
+    def __init__(self, velocity, size, sense_region_radius, pop, name):
 
         # World
         self.pop = pop
@@ -33,11 +48,12 @@ class individual:
         self.velocity = velocity
         self.size = size
         self.sense_region_radius = sense_region_radius
+        self.energy_use = get_energy_use(self)
         self.chromosome = [self.velocity, self.size, self.sense_region_radius]
 
         # Non-genetic Descriptors
         self.name = name
-        self.init_lifetime = lifetime
+        self.init_lifetime = get_lifetime(self.energy_use)
         self.x_pos = np.random.uniform(0, pop.win_x)
         self.y_pos = np.random.uniform(0, pop.win_y)
         self.x_size = size
@@ -50,7 +66,8 @@ class individual:
         self.alive = True
         self.foods_eaten = 0
         self.replications = 0
-        self.life_remaining = lifetime
+        self.life_remaining = self.init_lifetime
+        print(self.life_remaining)
 
         print("%s created" % self.name)
 
@@ -121,7 +138,7 @@ class individual:
         """Replicates the current individual
         """
         new_ind = individual(self.velocity, self.size,
-                             self.sense_region_radius, self.init_lifetime,
+                             self.sense_region_radius,
                              self.pop, "%s copy" % self.name)
         new_ind.x_pos = self.x_pos
         new_ind.y_pos = self.y_pos
@@ -220,7 +237,7 @@ class population:
 
         # Create initial individuals
         for i in range(self.pop_size):
-            ind_temp = individual(2, 30, 100, self.life_remainings,
+            ind_temp = individual(1, 30, 100,
                                   self, "I %s" % (i + 1))
             self.individuals.append(ind_temp)
 
@@ -349,7 +366,7 @@ class population:
         plt.show()
 
 
-pop = population(pop_size=10, food_number=10, food_regen=2, lifetimes=5000)
+pop = population(pop_size=1, food_number=0, food_regen=0, lifetimes=5000)
 pop.simulate()
 pop.plot_summary()
 plt.show()
