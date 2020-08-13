@@ -17,7 +17,7 @@ def random_direction():
 
 def similar_direction(theta_init):
     """Selects a random 2D direction using an Inverse CDF function in polar
-    coordinates
+    coordinates witin pi/2 radians of theta_init
     """
     theta = np.random.uniform(theta_init - np.pi / 4, theta_init + np.pi / 4)
 
@@ -62,9 +62,6 @@ rgb_z = [255] * population_size
 
 # Sense region characteristics
 sense_region_radius = 100
-# rgb_x_sense_region = [218] * population_size
-# rgb_y_sense_region = [112] * population_size
-# rgb_z_sense_region = [214] * population_size
 
 # Food characteristics
 food_number = 9
