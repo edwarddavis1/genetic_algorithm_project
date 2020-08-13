@@ -17,14 +17,19 @@ def is_item_in_sense_region(x_pos, y_pos, item_x_pos, item_y_pos, radius):
 
 
 class individual:
-    def __init__(self, velocity, size, lifetime, pop, name):
+    def __init__(self, velocity, size, sense_region_radius, lifetime, pop, name):
+        # Non-genetic
         self.name = name
+
+        # Genetic
         self.velocity = velocity
         self.size = size
         self.init_lifetime = lifetime
         self.lifetime = lifetime
+        self.sense_region_radius = sense_region_radius
+
+        # World
         self.pop = pop
-        self.sense_region_radius = 100
         self.current_theta = np.random.uniform(0, 2 * np.pi)
         self.x_pos = np.random.uniform(0, pop.win_x)
         self.y_pos = np.random.uniform(0, pop.win_y)
@@ -55,9 +60,10 @@ class individual:
         # Move towards food if within sense region
         move_randomly = True
         for food_piece in pop.foods:
-            food_in_sense_region = is_item_in_sense_region(self.x_pos, self.y_pos,
-                                                           food_piece.x_pos, food_piece.y_pos,
-                                                           self.sense_region_radius)
+            food_in_sense_region = is_item_in_sense_region(
+                self.x_pos, self.y_pos,
+                food_piece.x_pos, food_piece.y_pos,
+                self.sense_region_radius)
             if food_in_sense_region:
                 move_randomly = False
                 # Calculate distance to food
@@ -110,7 +116,8 @@ class individual:
     def replicate(self):
         """Replicates the current individual
         """
-        new_ind = individual(2, 30, self.init_lifetime,
+        new_ind = individual(self.velocity, self.size,
+                             self.sense_region_radius, self.init_lifetime,
                              self.pop, "%s copy" % self.name)
         new_ind.x_pos = self.x_pos
         new_ind.y_pos = self.y_pos
@@ -209,7 +216,7 @@ class population:
 
         # Create initial individuals
         for i in range(self.pop_size):
-            ind_temp = individual(2, 30, self.lifetimes,
+            ind_temp = individual(2, 30, 100, self.lifetimes,
                                   self, "I %s" % (i + 1))
             self.individuals.append(ind_temp)
 
@@ -229,6 +236,7 @@ class population:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                    pygame.quit()
 
             win.fill((0, 0, 0))
 
@@ -275,8 +283,9 @@ class population:
             for food_piece in self.foods:
                 # If not eaten, draw
                 if not food_piece.eaten:
-                    pygame.draw.rect(win, food_piece.colour, (food_piece.x_pos, food_piece.y_pos,
-                                                              food_piece.x_size, food_piece.y_size))
+                    pygame.draw.rect(win, food_piece.colour,
+                                     (food_piece.x_pos, food_piece.y_pos,
+                                      food_piece.x_size, food_piece.y_size))
                     food_index += 1
                 # If eaten remove from foods
                 else:
@@ -305,6 +314,7 @@ class population:
         # Document final individuals
         for ind in self.individuals:
             pop.add_individual_to_data(ind)
+            del ind
 
     def plot_summary(self):
         plt.figure()
@@ -336,12 +346,13 @@ class population:
         plt.show()
 
 
-pop = population(pop_size=15, food_number=16, food_regen=2, lifetimes=1000)
+pop = population(pop_size=1, food_number=0, food_regen=0, lifetimes=5000)
 pop.simulate()
 # pop.plot_summary()
 # plt.show()
 
 # pop.plot_ind(1)
+
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
