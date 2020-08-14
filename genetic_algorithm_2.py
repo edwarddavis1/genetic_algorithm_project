@@ -202,13 +202,12 @@ class food:
 
 
 class population:
-    def __init__(self, pop_size, food_number, food_regen, lifetimes):
+    def __init__(self, pop_size, food_number, food_regen):
         self.pop_size = pop_size
         self.win_x = 800
         self.win_y = 800
         self.food_number = food_number
         self.food_regen = food_regen
-        self.life_remainings = lifetimes
         self.individuals = []
         self.foods = []
         self.macro_pop_data = pd.DataFrame()
@@ -236,6 +235,18 @@ class population:
                    'Sense': ind.sense_region_radius}
         self.past_individual_data = self.past_individual_data.append(
             new_row, ignore_index=True)
+
+    def replot(self):
+        """Replots the live 3D plot of genes after an individual dies
+        """
+        pop.live_ax.clear()
+        for ind in self.individuals:
+            pop.live_ax.scatter(ind.velocity, ind.size, ind.sense_region_radius,
+                                color=pop.colour_for_plots)
+        self.live_ax.set_xlabel("Velocity")
+        self.live_ax.set_ylabel("Size")
+        self.live_ax.set_zlabel("Sense Region Radius")
+        pop.live_fig.canvas.draw()
 
     def simulate(self):
         """Starts a simulation of the population, opening a pygame window to
@@ -324,6 +335,7 @@ class population:
                 else:
                     self.dead_individuals += 1
                     del ind
+                    self.replot()
                     self.pop_size -= 1
 
             self.individuals = temp_individuals
@@ -376,31 +388,11 @@ class population:
         plt.legend()
         plt.show()
 
-    def plot_ind(self, ind):
-        """Plot frame, food and replications of individuals
-        """
-        ind_string = "ind_" + str(ind)
-        data = self.individual_data[ind_string]
-        frame_data = data[0]
-        food_eaten_data = data[1]
-        replication_data = data[2]
 
-        plt.figure()
-        plt.title("Individual: " + str(ind))
-        plt.xlabel("Frame")
-        plt.ylabel("#")
-        plt.plot(frame_data, food_eaten_data, label="Food Eaten")
-        plt.plot(frame_data, replication_data, label="Replications")
-        plt.legend()
-        plt.show()
-
-
-pop = population(pop_size=10, food_number=10, food_regen=1, lifetimes=5000)
+pop = population(pop_size=10, food_number=100, food_regen=5)
 pop.simulate()
 pop.plot_summary()
 plt.show()
-
-# pop.plot_ind(1)
 
 
 pd.set_option('display.max_rows', None)
