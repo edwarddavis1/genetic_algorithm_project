@@ -3,8 +3,15 @@ import pygame
 import math
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib
+import seaborn as sns
 
-# %matplotlib qt
+sns.set(style="whitegrid")
+sns.set_context("paper")
+
+%matplotlib qt
 
 
 def is_item_in_sense_region(x_pos, y_pos, item_x_pos, item_y_pos, radius):
@@ -69,6 +76,11 @@ class individual:
         self.life_remaining = self.init_lifetime
 
         print("%s created" % self.name)
+
+        # Plot traits for population tracking
+        pop.live_ax.scatter(self.velocity, self.size, self.sense_region_radius,
+                            color=pop.colour_for_plots)
+        pop.live_fig.canvas.draw()
 
     def __del__(self):
         pop.add_individual_to_data(self)
@@ -210,6 +222,7 @@ class population:
                          'Food Eaten', 'Replications', 'Size', 'Velocity', 'Sense']
         self.past_individual_data = self.past_individual_data.reindex(
             columns=column_titles)
+        self.colour_for_plots = (0, 0, 0, 0)
 
     def add_individual_to_data(self, ind):
         """Once an individual dies, add its genes and performance to dataframe
@@ -228,14 +241,21 @@ class population:
         """Starts a simulation of the population, opening a pygame window to
         animate the population evolution
         """
+
+        # Create window
         pygame.init()
         pygame.font.init()
         pop_font = pygame.font.Font('freesansbold.ttf', 32)
         ind_font = pygame.font.Font('freesansbold.ttf', 25)
-
-        # Create window
         win = pygame.display.set_mode((self.win_x, self.win_y))
         pygame.display.set_caption("Genetic Algorithm Animation")
+
+        # Create live plot figure
+        self.live_fig = plt.figure()
+        self.live_ax = Axes3D(self.live_fig)
+        self.live_ax.set_xlabel("Velocity")
+        self.live_ax.set_ylabel("Size")
+        self.live_ax.set_zlabel("Sense Region Radius")
 
         # Create initial individuals
         for i in range(self.pop_size):
@@ -248,12 +268,19 @@ class population:
             food_temp = food(self)
             self.foods.append(food_temp)
 
+        # Create colourmap limits
+        norm = matplotlib.colors.LogNorm(
+            vmin=0.0001, vmax=100000)
+        # Create colourmap
+        mapper = plt.cm.ScalarMappable(cmap='rainbow', norm=norm)
+
         # Main loop
         running = True
         self.frame_no = 0
         while running:
             pygame.time.delay(int(1 / (60 * 1000)))
             self.frame_no += 1
+            self.colour_for_plots = mapper.to_rgba(self.frame_no)
 
             # Stop the program when window is quit
             for event in pygame.event.get():
@@ -368,7 +395,7 @@ class population:
         plt.show()
 
 
-pop = population(pop_size=10, food_number=10, food_regen=2, lifetimes=5000)
+pop = population(pop_size=10, food_number=10, food_regen=1, lifetimes=5000)
 pop.simulate()
 pop.plot_summary()
 plt.show()
