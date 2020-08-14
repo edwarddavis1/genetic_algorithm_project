@@ -67,7 +67,6 @@ class individual:
         self.foods_eaten = 0
         self.replications = 0
         self.life_remaining = self.init_lifetime
-        print(self.life_remaining)
 
         print("%s created" % self.name)
 
@@ -135,10 +134,13 @@ class individual:
             self.y_pos += y_update
 
     def replicate(self):
-        """Replicates the current individual
+        """Replicates the current individual with mutations from parent
         """
-        new_ind = individual(self.velocity, self.size,
-                             self.sense_region_radius,
+        mutated_velocity = np.random.normal(self.velocity, 1 / 3)
+        mutated_size = np.random.normal(self.size, 10 / 3)
+        mutated_sense_region_radius = np.random.normal(self.sense_region_radius, 100 / 3)
+        new_ind = individual(mutated_velocity, mutated_size,
+                             mutated_sense_region_radius,
                              self.pop, "%s copy" % self.name)
         new_ind.x_pos = self.x_pos
         new_ind.y_pos = self.y_pos
@@ -366,7 +368,7 @@ class population:
         plt.show()
 
 
-pop = population(pop_size=1, food_number=0, food_regen=0, lifetimes=5000)
+pop = population(pop_size=10, food_number=10, food_regen=2, lifetimes=5000)
 pop.simulate()
 pop.plot_summary()
 plt.show()
