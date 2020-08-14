@@ -75,16 +75,16 @@ class individual:
         self.replications = 0
         self.life_remaining = self.init_lifetime
 
-        print("%s created" % self.name)
+        # print("%s created" % self.name)
 
         # Plot traits for population tracking
         pop.live_ax.scatter(self.velocity, self.size, self.sense_region_radius,
-                            color=pop.colour_for_plots)
+                            color='C0')
         pop.live_fig.canvas.draw()
 
     def __del__(self):
         pop.add_individual_to_data(self)
-        print("%s died" % self.name)
+        # print("%s died" % self.name)
 
     def update_position(self):
         """Steps the individual in a somewhat random direction
@@ -242,13 +242,13 @@ class population:
         pop.live_ax.clear()
         for ind in self.individuals:
             pop.live_ax.scatter(ind.velocity, ind.size, ind.sense_region_radius,
-                                color=pop.colour_for_plots)
+                                color='C0')
         self.live_ax.set_xlabel("Velocity")
         self.live_ax.set_ylabel("Size")
         self.live_ax.set_zlabel("Sense Region Radius")
         pop.live_fig.canvas.draw()
 
-    def simulate(self):
+    def simulate(self, graphics=True):
         """Starts a simulation of the population, opening a pygame window to
         animate the population evolution
         """
@@ -268,9 +268,14 @@ class population:
         self.live_ax.set_ylabel("Size")
         self.live_ax.set_zlabel("Sense Region Radius")
 
+        # If non-graphics option, speed up the interactions
+        speed_up = 1
+        if not graphics:
+            speed_up = 10
+
         # Create initial individuals
         for i in range(self.pop_size):
-            ind_temp = individual(1, 30, 100,
+            ind_temp = individual(1 * speed_up, 30, 100,
                                   self, "I %s" % (i + 1))
             self.individuals.append(ind_temp)
 
@@ -279,42 +284,36 @@ class population:
             food_temp = food(self)
             self.foods.append(food_temp)
 
-        # Create colourmap limits
-        norm = matplotlib.colors.LogNorm(
-            vmin=0.0001, vmax=100000)
-        # Create colourmap
-        mapper = plt.cm.ScalarMappable(cmap='rainbow', norm=norm)
-
         # Main loop
         running = True
         self.frame_no = 0
         while running:
-            pygame.time.delay(int(1 / (60 * 1000)))
+            if not graphics:
+                plt.pause(0.000001)
             self.frame_no += 1
-            self.colour_for_plots = mapper.to_rgba(self.frame_no)
 
             # Stop the program when window is quit
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
-            win.fill((0, 0, 0))
+            if graphics:
+                win.fill((0, 0, 0))
 
-            # Population text
-            pop_text = pop_font.render("Population: %s" %
-                                       self.pop_size, True, (255, 255, 255))
-            win.blit(pop_text, (20, 20))
+                # Population text
+                pop_text = pop_font.render("Population: %s" %
+                                           self.pop_size, True, (255, 255, 255))
+                win.blit(pop_text, (20, 20))
 
             # Food regeneration
             if self.food_regen:
-                food_regen_wait_time = 1000 / self.food_regen
+                food_regen_wait_time = 1000 / (self.food_regen * speed_up)
                 if self.frame_no % food_regen_wait_time == 0:
                     self.food_number += 1
                     new_food = food(self)
                     self.foods.append(new_food)
 
             # Step and animate each individual
-            ind_index = 0
             temp_individuals = []
             for ind in self.individuals:
                 # If alive, move
@@ -322,14 +321,14 @@ class population:
                     temp_individuals.append(ind)
                     ind.step()
 
-                    # Draw individual
-                    pygame.draw.rect(win, ind.colour,
-                                     (int(round(ind.x_pos)), int(round(ind.y_pos)),
-                                      int(round(ind.x_size)), int(round(ind.y_size))))
-                    # Label individual
-                    ind_text = ind_font.render(ind.name, True, (255, 255, 255))
-                    win.blit(ind_text, (int(round(ind.x_pos)), int(round(ind.y_pos))))
-                    ind_index += 1
+                    if graphics:
+                        # Draw individual
+                        pygame.draw.rect(win, ind.colour,
+                                         (int(round(ind.x_pos)), int(round(ind.y_pos)),
+                                          int(round(ind.x_size)), int(round(ind.y_size))))
+                        # Label individual
+                        ind_text = ind_font.render(ind.name, True, (255, 255, 255))
+                        win.blit(ind_text, (int(round(ind.x_pos)), int(round(ind.y_pos))))
 
                 # If dead remove from population
                 else:
@@ -345,17 +344,23 @@ class population:
             for food_piece in self.foods:
                 # If not eaten, draw
                 if not food_piece.eaten:
-                    pygame.draw.rect(win, food_piece.colour,
-                                     (int(round(food_piece.x_pos)), int(round(food_piece.y_pos)),
-                                      int(round(food_piece.x_size)), int(round(food_piece.y_size))))
                     food_index += 1
+
+                    if graphics:
+                        pygame.draw.rect(win, food_piece.colour,
+                                         (int(round(food_piece.x_pos)),
+                                          int(round(food_piece.y_pos)),
+                                          int(round(food_piece.x_size)),
+                                          int(round(food_piece.y_size))))
+
                 # If eaten remove from foods
                 else:
                     # self.foods = np.delete(self.foods, food_index)
                     self.foods.pop(food_index)
                     self.food_number -= 1
 
-            pygame.display.update()
+            if graphics:
+                pygame.display.update()
 
             # Summarise each step and save macro population data
             self.frame_data.append(self.frame_no)
@@ -390,7 +395,7 @@ class population:
 
 
 pop = population(pop_size=10, food_number=100, food_regen=5)
-pop.simulate()
+pop.simulate(graphics=False)
 pop.plot_summary()
 plt.show()
 
