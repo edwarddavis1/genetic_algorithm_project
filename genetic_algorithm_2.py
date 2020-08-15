@@ -78,8 +78,13 @@ class individual:
         # print("%s created" % self.name)
 
         # Plot traits for population tracking
+        # Set up colour map
+        norm = matplotlib.colors.Normalize(
+            vmin=0.0001, vmax=2 * pop.init_velocity * pop.speed_up)
+        # Create colourmap
+        mapper = plt.cm.ScalarMappable(cmap='gnuplot', norm=norm)
         pop.live_ax.scatter(self.velocity, self.size, self.sense_region_radius,
-                            color='C0')
+                            color=mapper.to_rgba(self.velocity))
         pop.live_fig.canvas.draw()
 
     def __del__(self):
@@ -150,7 +155,8 @@ class individual:
         """
         mutated_velocity = np.random.normal(self.velocity, 1 / 3)
         mutated_size = np.random.normal(self.size, 10 / 3)
-        mutated_sense_region_radius = np.random.normal(self.sense_region_radius, 100 / 3)
+        mutated_sense_region_radius = np.random.normal(
+            self.sense_region_radius, 100 / 3)
         new_ind = individual(mutated_velocity, mutated_size,
                              mutated_sense_region_radius,
                              self.pop, "%s copy" % self.name)
@@ -210,6 +216,8 @@ class population:
         self.food_regen = food_regen
         self.individuals = []
         self.foods = []
+        self.speed_up = 1
+        self.init_velocity = 1
         self.macro_pop_data = pd.DataFrame()
         self.frame_data = []
         self.pop_size_data = []
@@ -240,9 +248,16 @@ class population:
         """Replots the live 3D plot of genes after an individual dies
         """
         pop.live_ax.clear()
+
+        # Set up colour map
+        norm = matplotlib.colors.Normalize(
+            vmin=0.0001, vmax=2 * self.init_velocity * self.speed_up)
+        # Create colourmap
+        mapper = plt.cm.ScalarMappable(cmap='gnuplot', norm=norm)
+
         for ind in self.individuals:
             pop.live_ax.scatter(ind.velocity, ind.size, ind.sense_region_radius,
-                                color='C0')
+                                color=mapper.to_rgba(ind.velocity))
         self.live_ax.set_xlabel("Velocity")
         self.live_ax.set_ylabel("Size")
         self.live_ax.set_zlabel("Sense Region Radius")
@@ -268,14 +283,13 @@ class population:
         self.live_ax.set_ylabel("Size")
         self.live_ax.set_zlabel("Sense Region Radius")
 
-        # If non-graphics option, speed up the interactions
-        speed_up = 1
+        # If non-graphics option, speed up the interaction
         if not graphics:
-            speed_up = 10
+            self.speed_up = 10
 
         # Create initial individuals
         for i in range(self.pop_size):
-            ind_temp = individual(1 * speed_up, 30, 100,
+            ind_temp = individual(self.init_velocity * self.speed_up, 30, 100,
                                   self, "I %s" % (i + 1))
             self.individuals.append(ind_temp)
 
@@ -307,7 +321,7 @@ class population:
 
             # Food regeneration
             if self.food_regen:
-                food_regen_wait_time = 1000 / (self.food_regen * speed_up)
+                food_regen_wait_time = 1000 / (self.food_regen * self.speed_up)
                 if self.frame_no % food_regen_wait_time == 0:
                     self.food_number += 1
                     new_food = food(self)
@@ -327,8 +341,10 @@ class population:
                                          (int(round(ind.x_pos)), int(round(ind.y_pos)),
                                           int(round(ind.x_size)), int(round(ind.y_size))))
                         # Label individual
-                        ind_text = ind_font.render(ind.name, True, (255, 255, 255))
-                        win.blit(ind_text, (int(round(ind.x_pos)), int(round(ind.y_pos))))
+                        ind_text = ind_font.render(
+                            ind.name, True, (255, 255, 255))
+                        win.blit(ind_text, (int(round(ind.x_pos)),
+                                            int(round(ind.y_pos))))
 
                 # If dead remove from population
                 else:
