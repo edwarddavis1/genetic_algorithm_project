@@ -1,4 +1,4 @@
-## Project to simulate natural selection.
+## Fun summer project: simulating natural selection.
 
 # Current Progress:
 - Have individuals who compete for food, which regenerates in the environment at a set rate, and are given a value for velocity, size and sense region radius.
